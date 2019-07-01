@@ -246,8 +246,19 @@ set(LWS_LIBRARY_VERSION_MAJOR ${CPACK_PACKAGE_VERSION_MAJOR})
 set(LWS_LIBRARY_VERSION_MINOR ${CPACK_PACKAGE_VERSION_MINOR})
 set(LWS_LIBRARY_VERSION_PATCH ${CPACK_PACKAGE_VERSION_PATCH})
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/")
+# ESP32's CMake build system may not set PROJECT_SOURCE_DIR correctly??
+if (LWS_WITH_ESP32)
+	set(LWS_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+	set(LWS_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR})
+else()
+	set(LWS_SRC_DIR "${PROJECT_SOURCE_DIR}")
+	set(LWS_BIN_DIR "${PROJECT_BINARY_DIR}")
+endif()
 
+message("PROJECT_SOURCE_DIR: ${LWS_SRC_DIR} ${PROJECT_SOURCE_DIR}")
+message("PROJECT_BINARY_DIR: ${LWS_BIN_DIR} ${PROJECT_BINARY_DIR}")
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${LWS_SRC_DIR}/cmake/")
 
 message(STATUS "CMAKE_TOOLCHAIN_FILE='${CMAKE_TOOLCHAIN_FILE}'")
 
@@ -370,7 +381,7 @@ if (LWS_WITH_ESP32)
  set(LWS_HAVE_MALLOC 1)
  set(LWS_HAVE_REALLOC 1)
  set(LWS_HAVE_GETIFADDRS 1)
- set(LWS_WITH_ZIP_FOPS 1)
+ set(LWS_WITH_ZIP_FOPS 0)
  set(LWS_WITH_CUSTOM_HEADERS 0)
 endif()
 
@@ -674,7 +685,7 @@ if (LWS_SSL_SERVER_WITH_ECDH_CERT)
 	set(LWS_SSL_SERVER_WITH_ECDH_CERT 1)
 endif()
 
-include_directories("${PROJECT_BINARY_DIR}")
+include_directories("${LWS_BIN_DIR}")
 
 include(CheckCSourceCompiles)
 
@@ -699,9 +710,9 @@ endif()
 
 # Put the libraries and binaries that get built into directories at the
 # top of the build tree rather than in hard-to-find leaf directories. 
-SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin")
-SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
-SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
+SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${LWS_BIN_DIR}/bin")
+SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${LWS_BIN_DIR}/lib")
+SET(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${LWS_BIN_DIR}/lib")
 
 SET(LWS_INSTALL_PATH "${CMAKE_INSTALL_PREFIX}")
 
@@ -883,7 +894,7 @@ if (MSVC)
 	add_definitions(-D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE)
 endif(MSVC)
 
-include_directories("${PROJECT_SOURCE_DIR}/lib")
+include_directories("${LWS_SRC_DIR}/lib")
 
 # Group headers and sources.
 # Some IDEs use this for nicer file structure.
@@ -891,9 +902,9 @@ set(HDR_PRIVATE
 	lib/core/private.h)
 
 set(HDR_PUBLIC
-	"${PROJECT_SOURCE_DIR}/include/libwebsockets.h"
-	"${PROJECT_BINARY_DIR}/lws_config.h"
-	"${PROJECT_SOURCE_DIR}/plugins/ssh-base/include/lws-plugin-ssh.h"
+	"${LWS_SRC_DIR}/include/libwebsockets.h"
+	"${LWS_BIN_DIR}/lws_config.h"
+	"${LWS_SRC_DIR}/plugins/ssh-base/include/lws-plugin-ssh.h"
 	)
 
 set(SOURCES
@@ -1833,13 +1844,13 @@ CHECK_C_SOURCE_COMPILES("#include <netinet/tcp.h>\nint main(void) { return TCP_U
 set(CMAKE_REQUIRED_LIBRARIES ${temp})
 # Generate the lws_config.h that includes all the public compilation settings.
 configure_file(
-       "${PROJECT_SOURCE_DIR}/cmake/lws_config.h.in"
-       "${PROJECT_BINARY_DIR}/lws_config.h")
+	"${LWS_SRC_DIR}/cmake/lws_config.h.in"
+	"${LWS_BIN_DIR}/lws_config.h")
 
 # Generate the lws_config.h that includes all the private compilation settings.
 configure_file(
-       "${PROJECT_SOURCE_DIR}/cmake/lws_config_private.h.in"
-       "${PROJECT_BINARY_DIR}/lws_config_private.h")
+	"${LWS_SRC_DIR}/cmake/lws_config_private.h.in"
+	"${LWS_BIN_DIR}/lws_config_private.h")
 
 # Generate self-signed SSL certs for the test-server.
 
@@ -1868,8 +1879,8 @@ message(" GENCERTS = ${GENCERTS}")
 if (GENCERTS)
 	message("Generating SSL Certificates for the test-server...")
 
-	set(TEST_SERVER_SSL_KEY "${PROJECT_BINARY_DIR}/libwebsockets-test-server.key.pem")
-	set(TEST_SERVER_SSL_CERT "${PROJECT_BINARY_DIR}/libwebsockets-test-server.pem")
+	set(TEST_SERVER_SSL_KEY "${LWS_BIN_DIR}/libwebsockets-test-server.key.pem")
+	set(TEST_SERVER_SSL_CERT "${LWS_BIN_DIR}/libwebsockets-test-server.pem")
 
 	if (WIN32)
 		if (MINGW)
@@ -1878,7 +1889,7 @@ if (GENCERTS)
 				COMMAND "${OPENSSL_EXECUTABLE}" req -new -newkey rsa:1024 -days 10000 -nodes -x509 -subj "/C=GB/ST=Erewhon/L=All around/O=libwebsockets-test/CN=localhost" -keyout "${TEST_SERVER_SSL_KEY}" -out "${TEST_SERVER_SSL_CERT}"
 				RESULT_VARIABLE OPENSSL_RETURN_CODE)
 		else()
-			file(WRITE "${PROJECT_BINARY_DIR}/openssl_input.txt"
+			file(WRITE "${LWS_BIN_DIR}/openssl_input.txt"
 				"GB\n"
 				"Erewhon\n"
 				"All around\n"
@@ -1888,7 +1899,7 @@ if (GENCERTS)
 				)
 
 			# The "type" command is a bit picky with paths.
-			file(TO_NATIVE_PATH "${PROJECT_BINARY_DIR}/openssl_input.txt" OPENSSL_INPUT_WIN_PATH)
+			file(TO_NATIVE_PATH "${LWS_BIN_DIR}/openssl_input.txt" OPENSSL_INPUT_WIN_PATH)
 			message("OPENSSL_INPUT_WIN_PATH = ${OPENSSL_INPUT_WIN_PATH}")
 			message("cmd = \"${OPENSSL_EXECUTABLE}\" req -new -newkey rsa:1024 -days 10000 -nodes -x509 -keyout \"${TEST_SERVER_SSL_KEY}\" -out \"${TEST_SERVER_SSL_CERT}\"")
 
@@ -2048,7 +2059,7 @@ if ((LWS_ROLE_H1 OR LWS_ROLE_H2) AND NOT LWS_WITHOUT_TESTAPPS)
 				""
 				""
 				"")
-			target_include_directories(test-sshd PRIVATE "${PROJECT_SOURCE_DIR}/plugins/ssh-base/include")
+			target_include_directories(test-sshd PRIVATE "${LWS_SRC_DIR}/plugins/ssh-base/include")
 
 			endif()
 
@@ -2092,16 +2103,16 @@ if ((LWS_ROLE_H1 OR LWS_ROLE_H2) AND NOT LWS_WITHOUT_TESTAPPS)
 
 		# Data files for running the test server.
 		list(APPEND TEST_SERVER_DATA
-			"${PROJECT_SOURCE_DIR}/test-apps/favicon.ico"
-			"${PROJECT_SOURCE_DIR}/test-apps/leaf.jpg"
-			"${PROJECT_SOURCE_DIR}/test-apps/candide.zip"
-			"${PROJECT_SOURCE_DIR}/test-apps/libwebsockets.org-logo.svg"
-			"${PROJECT_SOURCE_DIR}/test-apps/http2.png"
-			"${PROJECT_SOURCE_DIR}/test-apps/wss-over-h2.png"
-			"${PROJECT_SOURCE_DIR}/test-apps/lws-common.js"
-			"${PROJECT_SOURCE_DIR}/test-apps/test.html"
-			"${PROJECT_SOURCE_DIR}/test-apps/test.css"
-			"${PROJECT_SOURCE_DIR}/test-apps/test.js")
+			"${LWS_SRC_DIR}/test-apps/favicon.ico"
+			"${LWS_SRC_DIR}/test-apps/leaf.jpg"
+			"${LWS_SRC_DIR}/test-apps/candide.zip"
+			"${LWS_SRC_DIR}/test-apps/libwebsockets.org-logo.svg"
+			"${LWS_SRC_DIR}/test-apps/http2.png"
+			"${LWS_SRC_DIR}/test-apps/wss-over-h2.png"
+			"${LWS_SRC_DIR}/test-apps/lws-common.js"
+			"${LWS_SRC_DIR}/test-apps/test.html"
+			"${LWS_SRC_DIR}/test-apps/test.css"
+			"${LWS_SRC_DIR}/test-apps/test.js")
 
 		add_custom_command(TARGET test-server
 						POST_BUILD 
@@ -2230,7 +2241,7 @@ if (LWS_WITH_SSL)
 			      "plugins/ssh-base/sshd.c;plugins/ssh-base/telnet.c;plugins/ssh-base/kex-25519.c" "plugins/ssh-base/crypto/chacha.c;plugins/ssh-base/crypto/ed25519.c;plugins/ssh-base/crypto/fe25519.c;plugins/ssh-base/crypto/ge25519.c;plugins/ssh-base/crypto/poly1305.c;plugins/ssh-base/crypto/sc25519.c;plugins/ssh-base/crypto/smult_curve25519_ref.c" "")
 		create_plugin(protocol_lws_sshd_demo "plugins/ssh-base/include" "plugins/protocol_lws_sshd_demo.c" "" "")
 
-		include_directories("${PROJECT_SOURCE_DIR}/plugins/ssh-base/include")
+		include_directories("${LWS_SRC_DIR}/plugins/ssh-base/include")
 endif()
 
 
@@ -2333,7 +2344,7 @@ if (UNIX)
 
 # Generate and install pkgconfig.
 # (This is not indented, because the tabs will be part of the output)
-file(WRITE "${PROJECT_BINARY_DIR}/libwebsockets.pc"
+file(WRITE "${LWS_BIN_DIR}/libwebsockets.pc"
 "prefix=\"${CMAKE_INSTALL_PREFIX}\"
 exec_prefix=\${prefix}
 libdir=\${exec_prefix}/lib${LIB_SUFFIX}
@@ -2347,10 +2358,10 @@ Libs: -L\${libdir} -lwebsockets
 Cflags: -I\${includedir}"
 )
 
-	install(FILES "${PROJECT_BINARY_DIR}/libwebsockets.pc"
+	install(FILES "${LWS_BIN_DIR}/libwebsockets.pc"
 		DESTINATION lib${LIB_SUFFIX}/pkgconfig)
 
-file(WRITE "${PROJECT_BINARY_DIR}/libwebsockets_static.pc"
+file(WRITE "${LWS_BIN_DIR}/libwebsockets_static.pc"
 "prefix=\"${CMAKE_INSTALL_PREFIX}\"
 exec_prefix=\${prefix}
 libdir=\${exec_prefix}/lib${LIB_SUFFIX}
@@ -2363,9 +2374,9 @@ Version: ${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_P
 Libs: -L\${libdir} -lwebsockets_static
 Libs.private:
 Cflags: -I\${includedir}"
-)
+			)
 
-	install(FILES "${PROJECT_BINARY_DIR}/libwebsockets_static.pc"
+	install(FILES "${LWS_BIN_DIR}/libwebsockets_static.pc"
 		DESTINATION lib${LIB_SUFFIX}/pkgconfig)
 
 
@@ -2386,18 +2397,18 @@ set(LWS_INSTALL_CMAKE_DIR ${DEF_INSTALL_CMAKE_DIR} CACHE PATH "Installation dire
 # Export targets (This is used for other CMake projects to easily find the libraries and include files).
 if (LWS_WITH_EXPORT_LWSTARGETS)
     export(TARGETS ${LWS_LIBRARIES}
-            FILE "${PROJECT_BINARY_DIR}/LibwebsocketsTargets.cmake")
+	     FILE "${LWS_BIN_DIR}/LibwebsocketsTargets.cmake")
 endif()
 
 export(PACKAGE libwebsockets)
 
 # Generate the config file for the build-tree.
 set(LWS__INCLUDE_DIRS 
-    "${PROJECT_SOURCE_DIR}/lib"
-    "${PROJECT_BINARY_DIR}")
+    "${LWS_SRC_DIR}/lib"
+    "${LWS_BIN_DIR}")
 set(LIBWEBSOCKETS_INCLUDE_DIRS ${LWS__INCLUDE_DIRS} CACHE PATH "Libwebsockets include directories")
-configure_file(${PROJECT_SOURCE_DIR}/cmake/LibwebsocketsConfig.cmake.in
-                ${PROJECT_BINARY_DIR}/LibwebsocketsConfig.cmake 
+configure_file(${LWS_SRC_DIR}/cmake/LibwebsocketsConfig.cmake.in
+		${LWS_BIN_DIR}/LibwebsocketsConfig.cmake
                 @ONLY)
 
 # Generate the config file for the installation tree.
@@ -2414,16 +2425,16 @@ file(RELATIVE_PATH
 # config file is located.
 set(LWS__INCLUDE_DIRS 
     "\${LWS_CMAKE_DIR}/${REL_INCLUDE_DIR}") 
-configure_file(${PROJECT_SOURCE_DIR}/cmake/LibwebsocketsConfig.cmake.in
-                ${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/LibwebsocketsConfig.cmake 
+configure_file(${LWS_SRC_DIR}/cmake/LibwebsocketsConfig.cmake.in
+		${LWS_BIN_DIR}${CMAKE_FILES_DIRECTORY}/LibwebsocketsConfig.cmake
                 @ONLY)
 
 # Generate version info for both build-tree and install-tree.
-configure_file(${PROJECT_SOURCE_DIR}/cmake/LibwebsocketsConfigVersion.cmake.in
-                ${PROJECT_BINARY_DIR}/LibwebsocketsConfigVersion.cmake 
+configure_file(${LWS_SRC_DIR}/cmake/LibwebsocketsConfigVersion.cmake.in
+		${LWS_BIN_DIR}/LibwebsocketsConfigVersion.cmake
                 @ONLY)
 
-			set_target_properties(${LWS_LIBRARIES}
+set_target_properties(${LWS_LIBRARIES}
 					PROPERTIES PUBLIC_HEADER "${HDR_PUBLIC}")
 
 #
@@ -2464,11 +2475,11 @@ if (NOT LWS_WITHOUT_TESTAPPS AND NOT LWS_WITHOUT_SERVER)
 			DESTINATION share/libwebsockets-test-server
 		COMPONENT examples)
 
-		install(FILES "${PROJECT_SOURCE_DIR}/test-apps/private/index.html"
+		install(FILES "${LWS_SRC_DIR}/test-apps/private/index.html"
 			DESTINATION share/libwebsockets-test-server/private
 			COMPONENT examples)
 if (LWS_WITH_CGI)
-	set(CGI_TEST_SCRIPT "${PROJECT_SOURCE_DIR}/test-apps/lws-cgi-test.sh")
+	set(CGI_TEST_SCRIPT "${LWS_SRC_DIR}/test-apps/lws-cgi-test.sh")
 	install(FILES ${CGI_TEST_SCRIPT}
 			PERMISSIONS  OWNER_EXECUTE GROUP_EXECUTE WORLD_EXECUTE OWNER_READ GROUP_READ WORLD_READ
 			DESTINATION share/libwebsockets-test-server
@@ -2539,8 +2550,8 @@ endif()
 
 # Install the LibwebsocketsConfig.cmake and LibwebsocketsConfigVersion.cmake
 install(FILES
-               "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/LibwebsocketsConfig.cmake"
-               "${PROJECT_BINARY_DIR}/LibwebsocketsConfigVersion.cmake"
+		"${LWS_BIN_DIR}${CMAKE_FILES_DIRECTORY}/LibwebsocketsConfig.cmake"
+		"${LWS_BIN_DIR}/LibwebsocketsConfigVersion.cmake"
                DESTINATION "${LWS_INSTALL_CMAKE_DIR}" COMPONENT dev)
 
 # Install exports for the install-tree.
@@ -2555,9 +2566,11 @@ set(CPACK_SOURCE_IGNORE_FILES $(CPACK_SOURCE_IGNORE_FILES) "/.git/" "/build/" "\
 # Most people are more used to "make dist" compared to "make package_source"
 add_custom_target(dist COMMAND "${CMAKE_MAKE_PROGRAM}" package_source)
 
+if (NOT LWS_WITH_ESP32)
 include(UseRPMTools)
-if (RPMTools_FOUND)
+	if (RPMTools_FOUND)
 	RPMTools_ADD_RPM_TARGETS(libwebsockets scripts/libwebsockets.spec)
+	endif()
 endif()
 
 message("---------------------------------------------------------------------")
@@ -2651,14 +2664,14 @@ if (LWS_WITH_MINIMAL_EXAMPLES)
 	  SET(${result} ${dirlist})
 	ENDMACRO()
 
-	SUBDIRLIST(SUBDIRS "${PROJECT_SOURCE_DIR}/minimal-examples")
+	SUBDIRLIST(SUBDIRS "${LWS_SRC_DIR}/minimal-examples")
 	FOREACH(subdir ${SUBDIRS})
 
-		SUBDIRLIST(SUBDIRS2 "${PROJECT_SOURCE_DIR}/minimal-examples/${subdir}")
+		SUBDIRLIST(SUBDIRS2 "${LWS_SRC_DIR}/minimal-examples/${subdir}")
 		FOREACH(subdir2 ${SUBDIRS2})
-			if (EXISTS "${PROJECT_SOURCE_DIR}/minimal-examples/${subdir}/${subdir2}/CMakeLists.txt")
-				message("Processing ${PROJECT_SOURCE_DIR}/minimal-examples/${subdir}/${subdir2}")
-				add_subdirectory("${PROJECT_SOURCE_DIR}/minimal-examples/${subdir}/${subdir2}")
+			if (EXISTS "${LWS_SRC_DIR}/minimal-examples/${subdir}/${subdir2}/CMakeLists.txt")
+				message("Processing ${LWS_SRC_DIR}/minimal-examples/${subdir}/${subdir2}")
+				add_subdirectory("${LWS_SRC_DIR}/minimal-examples/${subdir}/${subdir2}")
 			endif()
 		ENDFOREACH()
 	ENDFOREACH()
